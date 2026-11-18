@@ -8,7 +8,7 @@ jobs:
   macOS:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Check local note storage
         run: ./scripts/test.sh
       - name: Build signed local app
