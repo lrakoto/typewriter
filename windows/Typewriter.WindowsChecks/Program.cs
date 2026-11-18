@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -34,6 +35,21 @@ internal static class Program
             var point = editor.TranslatePoint(rect.TopLeft, window.Page);
             var gap = window.Page.RailY - point.Y;
             Expect(gap >= 12 && gap <= session.Preferences.FontSize * 1.7 + 24, $"Caret is {gap:0.0}pt above rail at {point}; expected close to active line");
+        });
+        Check("Native text is visibly rendered on the paper", () => {
+            window.Page.PinCursor(false); Drain(window);
+            var host = window.Page.Editor.Template.FindName("PART_ContentHost", window.Page.Editor) as ScrollViewer;
+            Expect(host is not null && host.ViewportHeight >= session.Preferences.FontSize, "TextBox viewport clips the text");
+            var bitmap = Render(window.Page);
+            var pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+            bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0);
+            int ink = 0;
+            for (int y = Math.Max(0, (int)window.Page.RailY - 65); y < (int)window.Page.RailY - 20; y++)
+                for (int x = 40; x < bitmap.PixelWidth - 40; x++) {
+                    var offset = (y * bitmap.PixelWidth + x) * 4;
+                    if (pixels[offset] < 115 && pixels[offset + 1] < 115 && pixels[offset + 2] < 115 && pixels[offset + 3] > 128) ink++;
+                }
+            Expect(ink > 50, $"No readable text pixels found at the active line (found {ink})");
         });
         Snapshot(window.Content as FrameworkElement, Path.Combine(artifacts, "windows-linen.png"));
         window.ToggleLibrary(); Drain(window);
@@ -86,11 +102,16 @@ internal static class Program
     private static void Snapshot(FrameworkElement? element, string path)
     {
         if (element is null) throw new Exception("No visual to render");
+        var bitmap = Render(element);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path); encoder.Save(stream);
+    }
+    private static RenderTargetBitmap Render(FrameworkElement element)
+    {
         element.UpdateLayout();
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth), (int)Math.Ceiling(element.ActualHeight), 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(element);
-        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(path); encoder.Save(stream);
+        return bitmap;
     }
     private static void Expect(bool passed, string message) { if (!passed) throw new Exception(message); }
 }

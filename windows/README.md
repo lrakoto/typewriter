@@ -44,5 +44,5 @@ The application can be cross-compiled on macOS with `dotnet build windows/Typewr
 ## Checks
 
 - Ten portable storage checks cover Unicode, autosave on switching notes, Trash recovery, moving the folder, independence from working directory, concurrent instances, corruption, atomic backups, Mac date compatibility, and preference validation.
-- Nine native editor checks cover empty/long notes, soft wrapping, Unicode line breaks, undo/redo, type-size changes, narrow windows, editing earlier lines, and separation of undo history between notes. The Windows job also renders native previews for visual inspection.
+- Ten native editor checks cover visible text rendering, empty/long notes, soft wrapping, Unicode line breaks, undo/redo, type-size changes, narrow windows, editing earlier lines, and separation of undo history between notes. The Windows job also renders native previews for visual inspection.
 - The actual self-contained EXE is copied into a fresh folder and launched with an unrelated working directory. The test creates a note and preferences, moves the entire folder to a path with spaces and Unicode characters, and relaunches the same EXE to verify the saved library and native editor. Test files never enter the downloadable package.

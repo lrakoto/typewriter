@@ -12,6 +12,14 @@ public sealed class WritingPage : Grid
 {
     public TextBox Editor { get; } = new();
     private readonly PaperDrawing paper = new();
+    private readonly ScrollViewer viewport = new() {
+        VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        CanContentScroll = false, Focusable = false
+    };
+    private readonly StackPanel document = new();
+    private readonly Border leadingPaper = new();
+    private readonly Border trailingPaper = new();
     private readonly DispatcherTimer motion = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private Preferences preferences = new();
     private bool changing;
@@ -29,7 +37,7 @@ public sealed class WritingPage : Grid
         Children.Add(paper);
         Editor.AcceptsReturn = true; Editor.AcceptsTab = true;
         Editor.TextWrapping = TextWrapping.Wrap;
-        Editor.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
+        Editor.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
         Editor.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         Editor.FontFamily = new FontFamily("Courier New");
         Editor.Background = Brushes.Transparent; Editor.BorderThickness = new Thickness(0);
@@ -46,7 +54,14 @@ public sealed class WritingPage : Grid
             if (preferences.KeySounds && Keyboard.Modifiers == ModifierKeys.None && e.Key is Key.Enter or Key.Back or Key.Delete)
                 KeySound.Play(e.Key == Key.Enter, preferences.Volume);
         };
-        Children.Add(Editor);
+        // Padding on a TextBox shrinks its internal viewport; it is not document
+        // space. Put the page margins inside an outer scrolling document so the
+        // first and last lines can reach the carriage without clipping glyphs.
+        document.Children.Add(leadingPaper);
+        document.Children.Add(Editor);
+        document.Children.Add(trailingPaper);
+        viewport.Content = document;
+        Children.Add(viewport);
         SizeChanged += (_, _) => { LayoutEditor(); QueuePin(); };
         MouseDown += (_, _) => Editor.Focus();
         motion.Tick += (_, _) => {
@@ -84,9 +99,12 @@ public sealed class WritingPage : Grid
     private void LayoutEditor()
     {
         if (ActualHeight <= 0 || ActualWidth <= 0) return;
-        Editor.Margin = new Thickness(0, 112, 0, Math.Max(0, ActualHeight - RailY + 10));
+        viewport.Margin = new Thickness(0, 112, 0, Math.Max(0, ActualHeight - RailY + 10));
         var margin = Math.Max(52, (ActualWidth - 680) / 2);
-        Editor.Padding = new Thickness(margin, Math.Max(90, LineTargetY - 112), margin, ActualHeight);
+        Editor.Padding = new Thickness(margin, 0, margin, 0);
+        Editor.MinHeight = preferences.FontSize * 1.7;
+        leadingPaper.Height = Math.Max(90, LineTargetY - 112);
+        trailingPaper.Height = ActualHeight;
     }
     private void QueuePin()
     {
@@ -99,12 +117,12 @@ public sealed class WritingPage : Grid
         if (pinning || ActualWidth <= 0 || ActualHeight <= 0) return;
         pinning = true;
         try {
-            Editor.UpdateLayout();
+            UpdateLayout();
             var rect = Editor.GetRectFromCharacterIndex(Editor.CaretIndex);
             if (rect.IsEmpty) return;
-            var offset = Editor.VerticalOffset + rect.Top - (LineTargetY - Editor.Margin.Top);
-            Editor.ScrollToVerticalOffset(Math.Max(0, offset));
-            Editor.UpdateLayout();
+            var offset = leadingPaper.Height + rect.Top - (LineTargetY - viewport.Margin.Top);
+            viewport.ScrollToVerticalOffset(Math.Max(0, offset));
+            UpdateLayout();
             rect = Editor.GetRectFromCharacterIndex(Editor.CaretIndex);
             if (rect.IsEmpty) return;
             targetX = Math.Clamp(rect.Left, 20, Math.Max(20, ActualWidth - 20));
