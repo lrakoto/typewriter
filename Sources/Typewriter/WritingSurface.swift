@@ -214,19 +214,8 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
         theme.paper.setFill()
         bounds.fill()
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let center = CGPoint(x: cursorX == 0 ? bounds.midX : cursorX, y: railY - 110)
         if spotlight {
-            let dark = theme == .midnight
-            let colors = [
-                NSColor(red: 1, green: 0.91, blue: 0.62, alpha: dark ? 0.14 : 0.38).cgColor,
-                NSColor(red: 1, green: 0.94, blue: 0.76, alpha: dark ? 0.05 : 0.17).cgColor,
-                NSColor(white: 0.06, alpha: dark ? 0.0 : 0.05).cgColor,
-                NSColor(white: 0.02, alpha: dark ? 0.26 : 0.23).cgColor
-            ] as CFArray
-            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.35, 0.72, 1]) {
-                context.drawRadialGradient(gradient, startCenter: center, startRadius: 0,
-                                           endCenter: center, endRadius: max(380, bounds.width * 0.58), options: [.drawsAfterEndLocation])
-            }
+            drawSpotlight(in: context)
         }
         // Fine horizontal fibers keep the paper tactile without image assets.
         context.setLineWidth(0.5)
@@ -235,6 +224,35 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
             context.move(to: CGPoint(x: 0, y: row)); context.addLine(to: CGPoint(x: bounds.width, y: row)); context.strokePath()
         }
         drawRail()
+    }
+
+    private func drawSpotlight(in context: CGContext) {
+        let dark = theme == .midnight
+        context.saveGState()
+        context.setFillColor(NSColor(white: 0.055, alpha: dark ? 0.30 : 0.34).cgColor)
+        context.fill(bounds)
+
+        // A close lamp projects upward from the carriage. Offset gradient
+        // circles give the light direction, with a small bright core at the
+        // active line and a soft, bounded falloff into the surrounding paper.
+        context.clip(to: CGRect(x: 0, y: 0, width: bounds.width, height: railY + 2))
+        context.translateBy(x: cursorX == 0 ? bounds.midX : cursorX, y: railY)
+        context.scaleBy(x: 0.86, y: 1)
+        let colors = [
+            NSColor(red: 1, green: 0.96, blue: 0.78, alpha: dark ? 0.36 : 0.92).cgColor,
+            NSColor(red: 1, green: 0.95, blue: 0.74, alpha: dark ? 0.28 : 0.78).cgColor,
+            NSColor(red: 1, green: 0.94, blue: 0.73, alpha: dark ? 0.13 : 0.32).cgColor,
+            NSColor(red: 1, green: 0.94, blue: 0.76, alpha: dark ? 0.025 : 0.06).cgColor,
+            NSColor(red: 1, green: 0.94, blue: 0.76, alpha: 0).cgColor
+        ] as CFArray
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.24, 0.56, 0.84, 1]) {
+            let radius = min(240, max(190, bounds.height * 0.31))
+            context.drawRadialGradient(gradient,
+                                       startCenter: CGPoint(x: 0, y: -fontSize * 1.7 - 22), startRadius: 0,
+                                       endCenter: CGPoint(x: 0, y: -130), endRadius: radius,
+                                       options: [.drawsAfterEndLocation])
+        }
+        context.restoreGState()
     }
 
     private func drawRail() {
