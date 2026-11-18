@@ -1,10 +1,16 @@
 # Typewriter
 
-A quiet, local macOS writing app inspired by a typewriter: warm paper, a moving pool of light, a carriage that follows the cursor, and optional mechanical key sounds.
+A quiet, local writing app for macOS and Windows 11, inspired by a typewriter: warm paper, a moving pool of light, a carriage that follows the cursor, and optional mechanical key sounds.
 
-Built with SwiftUI and AppKit. No accounts, server, or package dependencies. Requires macOS 14 or later.
+Native Mac app built with SwiftUI/AppKit, plus a standalone Windows WPF port. No accounts or server. The Mac app requires macOS 14 or later.
 
-## Run
+## Windows 11 — portable
+
+Extract `Typewriter-Windows-x64.zip` into a writable folder and double-click `Typewriter.exe`. No installer or separate runtime download is required. Notes and preferences live in `TypewriterData` beside the executable, so moving both together moves your library. The Windows build is available as a downloadable artifact from the **Windows portable build** GitHub Actions workflow.
+
+See [Windows instructions and checks](windows/README.md). The first portable build is unsigned; Windows may show a publisher notice.
+
+## Run on macOS
 
 ```sh
 ./scripts/build.sh
@@ -13,7 +19,7 @@ open dist/Typewriter.app
 
 You can also open `Package.swift` in Xcode or use `swift run Typewriter` during development. Copy `dist/Typewriter.app` to Applications if desired. This local build is ad-hoc signed; distribution to other Macs would require Developer ID signing and notarization.
 
-## Your writing
+## Your writing on macOS
 
 Notes save automatically on this Mac in `~/Library/Application Support/Typewriter/Notes`, one atomic JSON file per note. The app never uploads your writing. Export plain text or Markdown through the File menu. Deleted notes stay in Trash and can be restored. Source-code pushes to GitHub do not include your notes.
 
@@ -46,3 +52,5 @@ The local app was also checked interactively for note creation, titles, undo/red
 - `Sources/TypewriterCore`: note model and atomic file storage.
 - `Tests`: storage and native layout regression checks.
 - `scripts/build.sh`: creates the icon, release executable, and ad-hoc signed `dist/Typewriter.app`.
+
+The Windows implementation, portable storage, and Windows-specific checks are in `windows/`; packaging is handled by `scripts/build-windows.ps1`.

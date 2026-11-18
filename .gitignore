@@ -3,3 +3,7 @@
 dist/
 .DS_Store
 *.xcuserstate
+**/bin/
+**/obj/
+**/TypewriterData/
+.vs/
