@@ -35,13 +35,14 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
     private var spotlight = true
     private var fontSize: CGFloat = 17
     private var updating = false
+    private var pinning = false
     private var cursorX: CGFloat = 0
     private var targetX: CGFloat = 0
     private var motionTimer: Timer?
     private var lastSize: NSSize = .zero
     private var initialSelection = false
     private var railY: CGFloat { bounds.height * 0.73 }
-    private var lineTargetY: CGFloat { railY - 37 }
+    private var lineTargetY: CGFloat { railY - fontSize * 1.7 - 8 }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -72,6 +73,7 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
         editor.textContainer?.widthTracksTextView = true
         editor.textContainer?.lineFragmentPadding = 0
         editor.delegate = self
+        editor.pinRequested = { [weak self] in self?.pinCursor(animated: true) }
         editor.setAccessibilityLabel("Note text")
         scrollView.documentView = editor
         addSubview(scrollView)
@@ -127,16 +129,16 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
         updating = true
         let changed = lastSize != bounds.size
         lastSize = bounds.size
-        scrollView.frame = bounds
+        scrollView.frame = NSRect(x: 0, y: 112, width: bounds.width, height: max(100, railY - 122))
         let margin = max(52, (bounds.width - 680) / 2)
-        editor.textContainerInset = NSSize(width: margin, height: max(150, lineTargetY))
+        editor.textContainerInset = NSSize(width: margin, height: max(100, lineTargetY - scrollView.frame.minY))
         editor.setFrameSize(NSSize(width: bounds.width, height: max(editor.frame.height, bounds.height * 2)))
         editor.textContainer?.containerSize = NSSize(width: max(100, bounds.width - margin * 2), height: .greatestFiniteMagnitude)
         editor.layoutManager?.ensureLayout(for: editor.textContainer!)
         editor.sizeToFit()
         editor.setFrameSize(NSSize(width: bounds.width, height: max(editor.frame.height, bounds.height * 2)))
         updating = false
-        if changed || initialSelection { pinCursor(animated: !initialSelection) }
+        pinCursor(animated: !initialSelection && !changed)
         if initialSelection {
             initialSelection = false
             DispatchQueue.main.async { [weak self] in
@@ -160,6 +162,9 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
     }
 
     private func pinCursor(animated: Bool) {
+        guard !pinning else { return }
+        pinning = true
+        defer { pinning = false }
         guard bounds.width > 0, let manager = editor.layoutManager, let container = editor.textContainer else { return }
         manager.ensureLayout(for: container)
         let range = editor.selectedRange()
@@ -178,7 +183,7 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
             rect = NSRect(x: x, y: line.minY, width: 2, height: line.height)
         } else { rect = .zero }
         let y = editor.textContainerOrigin.y + rect.minY
-        let desiredScroll = max(0, y - lineTargetY)
+        let desiredScroll = max(0, y - (lineTargetY - scrollView.frame.minY))
         let contentHeight = max(bounds.height * 2, editor.textContainerOrigin.y * 2 + manager.usedRect(for: container).height + bounds.height)
         if abs(editor.frame.height - contentHeight) > 1 { editor.setFrameSize(NSSize(width: bounds.width, height: contentHeight)) }
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: desiredScroll))
@@ -201,6 +206,10 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
         needsDisplay = true
     }
 
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(editor)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         theme.paper.setFill()
         bounds.fill()
@@ -212,11 +221,11 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
                 NSColor(red: 1, green: 0.91, blue: 0.62, alpha: dark ? 0.14 : 0.38).cgColor,
                 NSColor(red: 1, green: 0.94, blue: 0.76, alpha: dark ? 0.05 : 0.17).cgColor,
                 NSColor(white: 0.06, alpha: dark ? 0.0 : 0.05).cgColor,
-                NSColor(white: 0.02, alpha: dark ? 0.26 : 0.19).cgColor
+                NSColor(white: 0.02, alpha: dark ? 0.26 : 0.23).cgColor
             ] as CFArray
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 0.35, 0.72, 1]) {
                 context.drawRadialGradient(gradient, startCenter: center, startRadius: 0,
-                                           endCenter: center, endRadius: max(440, bounds.width * 0.75), options: [.drawsAfterEndLocation])
+                                           endCenter: center, endRadius: max(380, bounds.width * 0.58), options: [.drawsAfterEndLocation])
             }
         }
         // Fine horizontal fibers keep the paper tactile without image assets.
@@ -262,6 +271,17 @@ final class TypewriterPage: NSView, NSTextViewDelegate {
 }
 
 final class TypewriterTextView: NSTextView {
+    var pinRequested: (() -> Void)?
+    // NSTextView normally adds scrolling context after insertion. In typewriter
+    // mode the page owns that position, including large pastes and soft wraps.
+    override func scrollRangeToVisible(_ range: NSRange) {
+        if let pinRequested { pinRequested() }
+        else { super.scrollRangeToVisible(range) }
+    }
+    override func scrollToVisible(_ rect: NSRect) -> Bool {
+        if let pinRequested { pinRequested(); return true }
+        return super.scrollToVisible(rect)
+    }
     var soundEnabled = false
     var soundVolume: Float = 0.25
     override func keyDown(with event: NSEvent) {

@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export CLANG_MODULE_CACHE_PATH="$PWD/.build/clang-cache"
+mkdir -p .build
+swiftc -parse-as-library \
+    Sources/Typewriter/Theme.swift Sources/Typewriter/KeySound.swift \
+    Sources/Typewriter/WritingSurface.swift Tests/LayoutChecks.swift \
+    -o .build/TypewriterLayoutChecks
+.build/TypewriterLayoutChecks

@@ -13,7 +13,18 @@ for dimension in 16 32 128 256 512; do
     doubled=$((dimension * 2))
     sips -z "$doubled" "$doubled" .build/icon-1024.png --out ".build/AppIcon.iconset/icon_${dimension}x${dimension}@2x.png" >/dev/null
 done
-iconutil -c icns .build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
+python3 - "$APP/Contents/Resources/AppIcon.icns" <<'PYICON'
+import pathlib, struct, sys
+# Modern macOS ICNS stores PNG representations in typed chunks.
+representations = [("icp4", 16), ("icp5", 32), ("icp6", 64), ("ic07", 128), ("ic08", 256), ("ic09", 512), ("ic10", 1024)]
+chunks = []
+for kind, size in representations:
+    filename = f"icon_{size}x{size}.png" if size not in (64, 1024) else ("icon_32x32@2x.png" if size == 64 else "icon_512x512@2x.png")
+    png = (pathlib.Path(".build/AppIcon.iconset") / filename).read_bytes()
+    chunks.append(kind.encode("ascii") + struct.pack(">I", len(png) + 8) + png)
+body = b"".join(chunks)
+pathlib.Path(sys.argv[1]).write_bytes(b"icns" + struct.pack(">I", len(body) + 8) + body)
+PYICON
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

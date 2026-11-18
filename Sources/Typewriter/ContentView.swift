@@ -113,7 +113,7 @@ struct ContentView: View {
             Divider()
             Text("Your words stay on this Mac.\nSaved automatically, as you write.").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             Button("Open notes folder") { model.revealNotes() }.font(.system(size: 11))
-        }.padding(24).frame(width: 330)
+        }.font(.system(size: 13)).foregroundStyle(Color.primary).padding(24).frame(width: 330)
     }
 
     private var library: some View {
